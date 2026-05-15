@@ -47,23 +47,38 @@ CHAT_TITLE = "재정경제부 RAG 챗봇"
 # Logging (WARNING/ERROR only)
 # ---------------------------------------------------------------------------
 def _setup_logging() -> logging.Logger:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
     log_name = f"chatbot_{datetime.now().strftime('%Y%m%d')}.log"
-    log_path = LOG_DIR / log_name
+    log_path: Path | None = None
+    for base in (LOG_DIR, Path(tempfile.gettempdir()) / "ai_education_logs"):
+        try:
+            base.mkdir(parents=True, exist_ok=True)
+            candidate = base / log_name
+            # 실제 쓰기 가능한지 확인 (Streamlit Cloud 등은 mkdir 성공 후에도 쓰기 거부될 수 있음)
+            with open(candidate, "a", encoding="utf-8"):
+                pass
+            log_path = candidate
+            break
+        except OSError:
+            continue
 
     root = logging.getLogger()
     root.handlers.clear()
     root.setLevel(logging.WARNING)
 
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-    fh = logging.FileHandler(log_path, encoding="utf-8")
-    fh.setLevel(logging.WARNING)
-    fh.setFormatter(fmt)
     ch = logging.StreamHandler()
     ch.setLevel(logging.WARNING)
     ch.setFormatter(fmt)
-    root.addHandler(fh)
     root.addHandler(ch)
+
+    if log_path is not None:
+        try:
+            fh = logging.FileHandler(log_path, encoding="utf-8")
+            fh.setLevel(logging.WARNING)
+            fh.setFormatter(fmt)
+            root.addHandler(fh)
+        except OSError:
+            pass
 
     for name in (
         "httpx",
